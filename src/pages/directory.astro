@@ -1,0 +1,91 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { supabase } from '../../app_v2/src/lib/supabase';
+
+const { data: places, error } = await supabase
+  .from('places')
+  .select(
+    `
+    id,
+    title,
+    rating,
+    rating_count,
+    category,
+    phone_number,
+    website,
+    address,
+    latitude,
+    longitude
+  `
+  )
+  .order('position');
+---
+
+<Layout title='Places Directory'>
+  <h1 class='text-4xl font-bold text-gray-900 mb-8'>Places Directory</h1>
+
+  {
+    error ? (
+      <div class='bg-red-50 border border-red-200 rounded-lg p-4'>
+        <p class='text-red-700'>Error loading places: {error.message}</p>
+      </div>
+    ) : (
+      <div class='grid gap-6 sm:grid-cols-2 lg:grid-cols-3'>
+        {places?.map((place) => (
+          <div class='bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow'>
+            <h2 class='text-xl font-semibold text-gray-900 mb-2'>
+              {place.title}
+            </h2>
+
+            {place.rating && (
+              <div class='flex items-center mb-3'>
+                <span class='text-yellow-400 text-lg'>★</span>
+                <span class='ml-1 font-medium'>{place.rating}</span>
+                {place.rating_count && (
+                  <span class='text-gray-500 text-sm ml-1'>
+                    ({place.rating_count} reviews)
+                  </span>
+                )}
+              </div>
+            )}
+
+            {place.category && (
+              <p class='text-primary-600 text-sm font-medium mb-3'>
+                {place.category}
+              </p>
+            )}
+
+            {place.address && (
+              <p class='text-gray-600 text-sm mb-4 flex items-start'>
+                <span class='mr-2'>📍</span>
+                <span>{place.address}</span>
+              </p>
+            )}
+
+            <div class='flex flex-wrap gap-3 mt-4 pt-4 border-t border-gray-100'>
+              {place.phone_number && (
+                <a
+                  href={`tel:${place.phone_number}`}
+                  class='inline-flex items-center text-sm text-primary-600 hover:text-primary-700'>
+                  <span class='mr-1'>📞</span>
+                  {place.phone_number}
+                </a>
+              )}
+
+              {place.website && (
+                <a
+                  href={place.website}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  class='inline-flex items-center text-sm text-primary-600 hover:text-primary-700'>
+                  <span class='mr-1'>🌐</span>
+                  Website
+                </a>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+</Layout>

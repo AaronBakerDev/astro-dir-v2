@@ -1,0 +1,6 @@
+name = "astro-directory-site"
+compatibility_date = "2023-12-01"
+
+[vars]
+SUPABASE_URL = "https://xynhhmliqdvyzrqnlvmk.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5bmhobWxpcWR2eXpycW5sdm1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzI5MzAxMzMsImV4cCI6MjA0ODUwNjEzM30.9CQJDsQNph80lCbckTf5lCCaTf5tSLLvonHx21WTIqw"
