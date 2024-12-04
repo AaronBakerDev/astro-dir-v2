@@ -1,7 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import SearchResults from '../components/directory/SearchResults.astro';
-import { supabase } from '../../app_v2/src/lib/supabase';
+import { supabase } from '../lib/supabase';
 
 // Get search params
 const url = new URL(Astro.request.url);
@@ -293,12 +293,15 @@ const getPaginationUrl = (page: number) => {
     const citySelect = document.querySelector('select[name="city"]');
 
     if (stateSelect && citySelect) {
-      stateSelect.addEventListener('change', () => {
-        citySelect.value = '';
-        if (!stateSelect.value) {
-          citySelect.disabled = true;
+      const stateSelectEl = stateSelect as HTMLSelectElement;
+      const citySelectEl = citySelect as HTMLSelectElement;
+      
+      stateSelectEl.addEventListener('change', () => {
+        citySelectEl.value = '';
+        if (!stateSelectEl.value) {
+          citySelectEl.disabled = true;
         } else {
-          citySelect.disabled = false;
+          citySelectEl.disabled = false;
         }
       });
     }

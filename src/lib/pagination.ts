@@ -26,24 +26,24 @@ export async function paginateQuery<T>(
   const to = from + itemsPerPage - 1;
 
   // Get total count first
-  const countQuery = query.select('count', { count: 'exact', head: true });
-  const { count, error: countError } = await countQuery;
+  const { count, error: countError } = await query.count();
 
   if (countError) {
     throw new Error(`Error getting count: ${countError.message}`);
   }
 
+  const totalItems = count || 0;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+
   // Get paginated data
   const { data, error: dataError } = await query
+    .select('*')
     .range(from, to)
     .order('rating', { ascending: false });
 
   if (dataError) {
     throw new Error(`Error getting data: ${dataError.message}`);
   }
-
-  const totalItems = count || 0;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   return {
     data: data || [],
