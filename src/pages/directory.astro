@@ -2,8 +2,41 @@
 import Layout from '../layouts/Layout.astro';
 import { supabase } from '../../app_v2/src/lib/supabase';
 
-const { data: places, error } = await supabase
-  .from('places')
+// Helper function to generate slug
+function generateSlug(title: string, id: number) {
+  return `${title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')}-${id}`;
+}
+
+// Get search params
+const url = new URL(Astro.request.url);
+const searchQuery = url.searchParams.get('search') || '';
+const categoryFilter = url.searchParams.get('category') || '';
+const page = parseInt(url.searchParams.get('page') || '1');
+const pageSize = 12;
+
+// Category mapping
+const categoryMapping = {
+  1: 'Masonry Contractors',
+  2: 'Chimney Repair',
+  3: 'Roofing Services',
+  4: 'Brick Repair',
+};
+
+// Reverse mapping for query_id lookup
+const categoryToQueryId = Object.entries(categoryMapping).reduce(
+  (acc, [id, name]) => {
+    acc[name] = parseInt(id);
+    return acc;
+  },
+  {}
+);
+
+// Build the query
+let query = supabase
+  .from('query_places_view')
   .select(
     `
     id,
@@ -14,78 +47,315 @@ const { data: places, error } = await supabase
     phone_number,
     website,
     address,
+    query_id,
+    query_text,
     latitude,
-    longitude
-  `
+    longitude,
+    city,
+    province_state,
+    created_at
+  `,
+    { count: 'exact' }
   )
-  .order('position');
+  .in('query_id', [1, 2, 3, 4]);
+
+// Apply full-text search if there's a search query
+if (searchQuery) {
+  query = query.textSearch('title', searchQuery);
+}
+
+// Apply category filter if selected
+if (categoryFilter) {
+  const queryId = categoryToQueryId[categoryFilter];
+  if (queryId) {
+    query = query.eq('query_id', queryId);
+  }
+}
+
+// Execute the query with ordering and pagination
+const {
+  data: places,
+  error,
+  count,
+} = await query
+  .order('rating', { ascending: false })
+  .range((page - 1) * pageSize, page * pageSize - 1);
+
+const totalPages = count ? Math.ceil(count / pageSize) : 0;
+
+// Category descriptions
+const categoryDescriptions = {
+  'Masonry Contractors': 'Expert masonry services for your home or business',
+  'Chimney Repair': 'Professional chimney repair and maintenance services',
+  'Roofing Services': 'Specialized roofing and chimney flashing repairs',
+  'Brick Repair': 'Expert brick repair and restoration services',
+};
+
+// Group places by their category
+const placesByCategory = places?.reduce((acc, place) => {
+  const category = place.category || categoryMapping[place.query_id] || 'Other';
+  if (!acc[category]) {
+    acc[category] = [];
+  }
+  acc[category].push(place);
+  return acc;
+}, {});
+
+// Sort categories to ensure consistent order
+const sortedCategories = Object.keys(categoryMapping).map(
+  (id) => categoryMapping[id]
+);
+
+// Format date
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
 ---
 
-<Layout title='Places Directory'>
-  <h1 class='text-4xl font-bold text-gray-900 mb-8'>Places Directory</h1>
+<Layout title='ChimneyRepairPro Directory'>
+  <div class='mb-8'>
+    <h1 class='text-4xl font-bold text-gray-900 mb-3'>
+      Find Local Chimney Professionals
+    </h1>
+    <p class='text-lg text-gray-600 mb-6'>
+      Connect with trusted chimney repair experts in your area
+    </p>
+
+    <form class='flex flex-col sm:flex-row gap-4 mb-6' method='get'>
+      <div class='flex-1'>
+        <input
+          type='search'
+          name='search'
+          value={searchQuery}
+          placeholder='Search for chimney professionals...'
+          class='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500'
+        />
+      </div>
+      <div class='sm:w-48'>
+        <select
+          name='category'
+          class='w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500'>
+          <option value=''>All Services</option>
+          {
+            sortedCategories.map((category) => (
+              <option value={category} selected={category === categoryFilter}>
+                {category}
+              </option>
+            ))
+          }
+        </select>
+      </div>
+      <div class='sm:w-24'>
+        <button
+          type='submit'
+          class='w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors'>
+          Search
+        </button>
+      </div>
+    </form>
+
+    <div class='text-sm text-gray-600 mb-6'>
+      {
+        searchQuery || categoryFilter ? (
+          <p>
+            Showing {(page - 1) * pageSize + 1}-
+            {Math.min(page * pageSize, count || 0)} of {count || 0}{' '}
+            professionals
+            {searchQuery && ` matching "${searchQuery}"`}
+            {categoryFilter && ` in ${categoryFilter}`}
+          </p>
+        ) : (
+          <p>Browse trusted chimney professionals by service type</p>
+        )
+      }
+    </div>
+  </div>
 
   {
-    error ? (
+    error && (
       <div class='bg-red-50 border border-red-200 rounded-lg p-4'>
-        <p class='text-red-700'>Error loading places: {error.message}</p>
+        <p class='text-red-700'>Error loading professionals: {error.message}</p>
       </div>
-    ) : (
-      <div class='grid gap-6 sm:grid-cols-2 lg:grid-cols-3'>
-        {places?.map((place) => (
-          <div class='bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow'>
-            <h2 class='text-xl font-semibold text-gray-900 mb-2'>
-              {place.title}
-            </h2>
+    )
+  }
 
-            {place.rating && (
-              <div class='flex items-center mb-3'>
-                <span class='text-yellow-400 text-lg'>★</span>
-                <span class='ml-1 font-medium'>{place.rating}</span>
-                {place.rating_count && (
-                  <span class='text-gray-500 text-sm ml-1'>
-                    ({place.rating_count} reviews)
-                  </span>
-                )}
+  {
+    !error && (searchQuery || categoryFilter) ? (
+      <>
+        <div class='grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8'>
+          {places?.map((place) => (
+            <a
+              href={`/places/${generateSlug(place.title, place.id)}`}
+              class='block bg-white border border-gray-200 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 h-full flex flex-col'>
+              <div class='p-6 flex-1 flex flex-col'>
+                <div class='flex justify-between items-start mb-auto'>
+                  <div>
+                    <h3 class='text-xl font-semibold text-gray-900 mb-1'>
+                      {place.title}
+                    </h3>
+                    {((place.category &&
+                      !place.category
+                        .toLowerCase()
+                        .includes('not specified')) ||
+                      categoryMapping[place.query_id]) && (
+                      <p class='text-primary-600 text-sm font-medium'>
+                        {(!place.category
+                          ?.toLowerCase()
+                          .includes('not specified') &&
+                          place.category) ||
+                          categoryMapping[place.query_id]}
+                      </p>
+                    )}
+                  </div>
+                  {place.rating && (
+                    <div class='flex items-center bg-primary-50 px-2 py-1 rounded-lg'>
+                      <span class='text-yellow-500 text-lg mr-1'>★</span>
+                      <span class='font-medium text-primary-700'>
+                        {place.rating}
+                      </span>
+                      {place.rating_count && (
+                        <span class='text-primary-600 text-sm ml-1'>
+                          ({place.rating_count})
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div class='mt-4 space-y-2'>
+                  {place.address && (
+                    <p class='text-gray-600 text-sm flex items-start'>
+                      <span class='text-gray-400 mr-2'>📍</span>
+                      <span>
+                        {place.address}
+                        {(place.city || place.province_state) && (
+                          <span class='block mt-1 text-gray-500'>
+                            {[place.city, place.province_state]
+                              .filter(Boolean)
+                              .join(', ')}
+                          </span>
+                        )}
+                      </span>
+                    </p>
+                  )}
+
+                  {place.phone_number && (
+                    <p class='text-gray-600 text-sm flex items-center'>
+                      <span class='text-gray-400 mr-2'>📞</span>
+                      <span>{place.phone_number}</span>
+                    </p>
+                  )}
+                </div>
               </div>
-            )}
 
-            {place.category && (
-              <p class='text-primary-600 text-sm font-medium mb-3'>
-                {place.category}
-              </p>
-            )}
-
-            {place.address && (
-              <p class='text-gray-600 text-sm mb-4 flex items-start'>
-                <span class='mr-2'>📍</span>
-                <span>{place.address}</span>
-              </p>
-            )}
-
-            <div class='flex flex-wrap gap-3 mt-4 pt-4 border-t border-gray-100'>
-              {place.phone_number && (
-                <a
-                  href={`tel:${place.phone_number}`}
-                  class='inline-flex items-center text-sm text-primary-600 hover:text-primary-700'>
-                  <span class='mr-1'>📞</span>
-                  {place.phone_number}
-                </a>
+              {(place.website || place.phone_number) && (
+                <div class='border-t border-gray-100 px-6 py-4 bg-gray-50 rounded-b-lg mt-auto'>
+                  <div class='flex items-center justify-between'>
+                    <div class='flex items-center space-x-4'>
+                      {place.website && (
+                        <span class='text-primary-600 text-sm font-medium hover:text-primary-700'>
+                          Visit Website
+                        </span>
+                      )}
+                      {place.phone_number && (
+                        <span class='text-primary-600 text-sm font-medium hover:text-primary-700'>
+                          Call Now
+                        </span>
+                      )}
+                    </div>
+                    <span class='text-gray-400'>→</span>
+                  </div>
+                </div>
               )}
+            </a>
+          ))}
+        </div>
 
-              {place.website && (
-                <a
-                  href={place.website}
-                  target='_blank'
-                  rel='noopener noreferrer'
-                  class='inline-flex items-center text-sm text-primary-600 hover:text-primary-700'>
-                  <span class='mr-1'>🌐</span>
-                  Website
-                </a>
-              )}
-            </div>
+        {totalPages > 1 && (
+          <div class='flex justify-center gap-2 mt-8'>
+            {page > 1 && (
+              <a
+                href={`?${new URLSearchParams({
+                  ...Object.fromEntries(url.searchParams),
+                  page: (page - 1).toString(),
+                })}`}
+                class='px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50'>
+                Previous
+              </a>
+            )}
+            <span class='px-4 py-2'>
+              Page {page} of {totalPages}
+            </span>
+            {page < totalPages && (
+              <a
+                href={`?${new URLSearchParams({
+                  ...Object.fromEntries(url.searchParams),
+                  page: (page + 1).toString(),
+                })}`}
+                class='px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50'>
+                Next
+              </a>
+            )}
           </div>
+        )}
+      </>
+    ) : (
+      // Category-based view
+      <div class='space-y-8'>
+        {sortedCategories.map((category) => (
+          <a
+            href={`?category=${encodeURIComponent(category)}`}
+            class='block bg-white border border-gray-200 rounded-lg p-6 hover:bg-gray-50 transition-colors'>
+            <div>
+              <h2 class='text-2xl font-semibold text-gray-900'>{category}</h2>
+              <p class='text-gray-600 text-sm mt-1'>
+                {categoryDescriptions[category]}
+              </p>
+            </div>
+            <div class='mt-4 text-primary-600 hover:text-primary-700 text-sm font-medium'>
+              View all professionals →
+            </div>
+          </a>
         ))}
       </div>
     )
   }
 </Layout>
+
+<script>
+  const searchForm = document.getElementById('searchForm') as HTMLFormElement;
+  const useMyLocationBtn = document.getElementById('useMyLocation');
+  const latInput = searchForm?.querySelector(
+    'input[name="lat"]'
+  ) as HTMLInputElement;
+  const lonInput = searchForm?.querySelector(
+    'input[name="lon"]'
+  ) as HTMLInputElement;
+
+  useMyLocationBtn?.addEventListener('click', () => {
+    if (navigator.geolocation) {
+      useMyLocationBtn.textContent = '📍 Getting location...';
+      useMyLocationBtn.setAttribute('disabled', 'true');
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          latInput.value = position.coords.latitude.toString();
+          lonInput.value = position.coords.longitude.toString();
+          searchForm?.submit();
+        },
+        (error) => {
+          console.error('Geolocation error:', error);
+          alert('Unable to get your location. Please try again.');
+          useMyLocationBtn.textContent = '📍 Search near me';
+          useMyLocationBtn.removeAttribute('disabled');
+        }
+      );
+    } else {
+      alert('Geolocation is not supported by your browser');
+    }
+  });
+</script>
