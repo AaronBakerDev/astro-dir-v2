@@ -1,22 +1,64 @@
 ---
 interface Props {
   title: string;
+  description?: string;
+  image?: string;
+  canonicalURL?: string;
 }
 
-const { title } = Astro.props;
+const {
+  title,
+  description = 'Discover and explore amazing places in your area',
+  image = '/og-image.jpg',
+  canonicalURL = Astro.url.href,
+} = Astro.props;
+
+const siteTitle = 'Places Directory';
+const fullTitle = title === siteTitle ? title : `${title} | ${siteTitle}`;
 ---
 
 <html lang='en'>
   <head>
     <meta charset='utf-8' />
     <meta name='viewport' content='width=device-width, initial-scale=1' />
-    <title>{title}</title>
+    <meta name='generator' content={Astro.generator} />
+
+    <!-- Primary Meta Tags -->
+    <title>{fullTitle}</title>
+    <meta name='title' content={fullTitle} />
+    <meta name='description' content={description} />
+
+    <!-- Canonical URL -->
+    <link rel='canonical' href={canonicalURL} />
+
+    <!-- Open Graph / Facebook -->
+    <meta property='og:type' content='website' />
+    <meta property='og:url' content={Astro.url.href} />
+    <meta property='og:title' content={fullTitle} />
+    <meta property='og:description' content={description} />
+    {image && <meta property='og:image' content={new URL(image, Astro.url)} />}
+
+    <!-- Twitter -->
+    <meta property='twitter:card' content='summary_large_image' />
+    <meta property='twitter:url' content={Astro.url.href} />
+    <meta property='twitter:title' content={fullTitle} />
+    <meta property='twitter:description' content={description} />
+    {
+      image && (
+        <meta property='twitter:image' content={new URL(image, Astro.url)} />
+      )
+    }
+
+    <!-- Fonts -->
     <link rel='preconnect' href='https://fonts.googleapis.com' />
     <link rel='preconnect' href='https://fonts.gstatic.com' crossorigin />
     <link
       href='https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
       rel='stylesheet'
     />
+
+    <!-- Additional Meta Tags -->
+    <slot name='head' />
   </head>
   <body class="bg-gray-50 min-h-screen font-['Inter']">
     <nav class='bg-white shadow-sm'>
@@ -26,10 +68,13 @@ const { title } = Astro.props;
             <a
               href='/'
               class='flex items-center text-primary-600 font-semibold text-lg'>
-              📍 Places Directory
+              📍 {siteTitle}
             </a>
           </div>
-          <div class='flex items-center'>
+          <div class='flex items-center space-x-4'>
+            <a href='/directory' class='text-gray-600 hover:text-gray-900'>
+              Directory
+            </a>
             <a href='/schema' class='text-gray-600 hover:text-gray-900'>
               Schema
             </a>
@@ -41,6 +86,14 @@ const { title } = Astro.props;
     <main class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'>
       <slot />
     </main>
+
+    <footer class='bg-white border-t border-gray-200 mt-12'>
+      <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6'>
+        <p class='text-center text-gray-500 text-sm'>
+          © {new Date().getFullYear()}
+          {siteTitle}. All rights reserved.
+        </p>
+      </div>
+    </footer>
   </body>
 </html>
-
