@@ -10,6 +10,15 @@ export default defineConfig({
     runtime: {
       mode: 'local',
       type: 'pages',
+      bindings: {
+        // Add your environment variables here
+        SUPABASE_URL: { type: 'plain_text' },
+        SUPABASE_ANON_KEY: { type: 'plain_text' },
+      },
+    },
+    routes: {
+      strategy: 'include',
+      patterns: ['/*'],
     },
   }),
   integrations: [tailwind()],
