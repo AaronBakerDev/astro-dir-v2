@@ -3,40 +3,45 @@ import Layout from '../../layouts/Layout.astro';
 import { supabase } from '../../../app_v2/src/lib/supabase';
 
 console.log('🚀 Page Processing Started');
-const rawId = Astro.params.id ?? '';
-const id = parseInt(rawId, 10);
+const slug = Astro.params.slug;
+console.log('📝 Processing slug:', slug);
 
-if (isNaN(id)) {
-  console.error('❌ Invalid ID:', { rawId });
-  return new Response('Invalid ID', { status: 400 });
+// Determine if it's a numeric ID or a slug
+const isNumeric = /^\d+$/.test(slug || '');
+let query = supabase.from('places').select('*');
+
+if (isNumeric) {
+  query = query.eq('id', parseInt(slug || '0'));
+} else {
+  query = query.eq('slug', `"${slug}"`);
 }
 
-const { data: place, error } = await supabase
-  .from('places')
-  .select('*')
-  .eq('id', id)
-  .single();
+const { data: place, error } = await query.single();
 
-console.log('🔍 Query Details:', {
-  rawId,
-  id,
-  matchFound: !!place,
-  error: error || 'No error',
-  query: `SELECT * FROM places WHERE id = ${id}`,
+console.log('🔍 Query Response:', {
+  isNumeric,
+  slug,
+  found: !!place,
+  error: error?.message || null,
 });
 
-if (error?.message) {
+if (error) {
   console.error('❌ Database Error:', error);
   return new Response(`Database error: ${error.message}`, { status: 500 });
 }
 
 if (!place) {
-  console.error('❌ Place not found:', { id });
+  console.error('❌ Place not found:', { slug });
   return new Response('Place not found', { status: 404 });
 }
 
-console.log('✅ Place found:', place);
+// If accessed by ID, redirect to slug URL
+if (isNumeric && place.slug) {
+  console.log('🔄 Redirecting to slug URL');
+  return Astro.redirect(`/places/${place.slug.replace(/^"|"$/g, '')}`, 301);
+}
 
+// Build page metadata
 const description = [
   place.title,
   place.category,
@@ -45,6 +50,8 @@ const description = [
 ]
   .filter(Boolean)
   .join(' - ');
+
+console.log('✅ Rendering page for:', place.title);
 ---
 
 <Layout title={place.title} description={description}>
@@ -70,13 +77,12 @@ const description = [
       {
         place.rating && (
           <section class='mb-8 pb-8 border-b border-gray-100'>
-            <h2 class='text-lg font-semibold mb-2'>Rating</h2>
-            <div class='flex items-center'>
-              <span class='text-yellow-400 text-2xl'>★</span>
-              <span class='ml-2 text-xl font-medium'>{place.rating}</span>
+            <div class='flex items-center gap-2'>
+              <span class='text-yellow-500 text-xl'>★</span>
+              <span class='font-medium'>{place.rating}</span>
               {place.rating_count && (
-                <span class='text-gray-500 ml-2'>
-                  ({place.rating_count.toLocaleString()} reviews)
+                <span class='text-gray-500'>
+                  ({place.rating_count} reviews)
                 </span>
               )}
             </div>
@@ -110,7 +116,7 @@ const description = [
               <a
                 href={`tel:${place.phone_number}`}
                 class='text-primary-600 hover:text-primary-700 flex items-center gap-2'>
-                <span />
+                <span>📞</span>
                 {place.phone_number}
               </a>
             </section>
@@ -133,10 +139,6 @@ const description = [
           )
         }
       </div>
-
-      <footer class='mt-8 pt-6 border-t border-gray-200 text-sm text-gray-500'>
-        <p>Listed since {new Date(place.created_at).toLocaleDateString()}</p>
-      </footer>
     </article>
   </div>
 </Layout>
