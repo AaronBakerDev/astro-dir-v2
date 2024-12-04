@@ -1,57 +1,61 @@
 ---
-import { generateSlug } from '../../utils/slugUtils';
+import type { Place } from '../../types/place';
 
 interface Props {
-  place: {
-    id: number;
-    title: string;
-    category?: string;
-    rating?: number;
-    rating_count?: number;
-    address?: string;
-    city?: string;
-    province_state?: string;
-    phone_number?: string;
-    slug?: string;
-  };
+  place: Place;
 }
 
 const { place } = Astro.props;
-const slug = place.slug || generateSlug(place.title, place.id);
+
+// Format address for US locations
+const formatAddress = (place: Place) => {
+  const parts: string[] = [];
+  if (place.address) parts.push(place.address);
+  if (place.city) parts.push(place.city);
+  if (place.province_state) parts.push(place.province_state);
+  return parts.join(', ');
+};
+
+const address = formatAddress(place);
 ---
 
-<a
-  href={`/places/${slug}`}
-  class='block bg-white rounded-lg border border-gray-200 p-6 hover:shadow-sm transition-all'>
-  <h3 class='text-xl font-semibold text-gray-900 mb-2'>{place.title}</h3>
+<div
+  class='bg-white rounded-lg border border-gray-200 p-6 hover:border-red-100 hover:shadow-sm transition-all'>
+  <h3 class='text-xl font-semibold mb-2'>
+    <a
+      href={`/places/${place.slug || ''}`}
+      class='text-gray-900 hover:text-red-600'>
+      {place.title}
+    </a>
+  </h3>
+  {place.category && <p class='text-red-600 text-sm mb-4'>{place.category}</p>}
 
-  {place.category && <p class='text-red-600 text-sm mb-2'>{place.category}</p>}
-
-  {
-    place.rating && (
-      <div class='flex items-center gap-1 mb-2'>
-        <span class='text-yellow-400'>★</span>
-        <span class='text-gray-700'>{place.rating.toFixed(1)}</span>
-        {place.rating_count && (
-          <span class='text-gray-500 text-sm'>
-            ({place.rating_count} reviews)
-          </span>
-        )}
-      </div>
-    )
-  }
-
-  <p class='text-gray-600 text-sm mb-2'>
+  <div class='flex items-center mb-4'>
     {
-      place.address
-        ? place.address
-        : [place.city, place.province_state].filter(Boolean).join(', ')
+      place.rating && (
+        <div class='flex items-center'>
+          <span class='text-yellow-400 mr-1'>★</span>
+          <span class='font-medium'>{place.rating.toFixed(1)}</span>
+          {place.rating_count && (
+            <span class='text-gray-500 text-sm ml-1'>
+              ({place.rating_count}{' '}
+              {place.rating_count === 1 ? 'review' : 'reviews'})
+            </span>
+          )}
+        </div>
+      )
     }
-  </p>
+  </div>
+
+  {address && <p class='text-gray-600 mb-4'>{address}</p>}
 
   {
     place.phone_number && (
-      <p class='text-gray-600 text-sm'>{place.phone_number}</p>
+      <p class='text-gray-600'>
+        <a href={`tel:${place.phone_number}`} class='hover:text-red-600'>
+          {place.phone_number}
+        </a>
+      </p>
     )
   }
-</a>
+</div>

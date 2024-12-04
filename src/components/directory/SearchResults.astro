@@ -1,28 +1,14 @@
 ---
 import PlaceCard from './PlaceCard.astro';
-
-type Place = {
-  id: number;
-  title: string;
-  category?: string;
-  rating?: number;
-  rating_count?: number;
-  address?: string;
-  city?: string;
-  province_state?: string;
-  phone_number?: string;
-  slug?: string;
-};
-
-type Category = {
-  id: string;
-  name: string;
-  description: string;
-};
+import type { Place } from '../../types/place';
 
 interface Props {
   places: Place[];
-  selectedCategory?: Category;
+  selectedCategory?: {
+    id: string;
+    name: string;
+    description: string;
+  };
   totalCount?: number;
 }
 

@@ -1,6 +1,7 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import SearchResults from '../components/directory/SearchResults.astro';
+import { searchService } from '../lib/services/searchService';
 import { supabase } from '../lib/supabase';
 
 // Get search params
@@ -73,56 +74,43 @@ const getCitiesForState = (state: string) => {
 
 const availableCities = stateFilter ? getCitiesForState(stateFilter) : [];
 
-// Build and execute the query
-let query = supabase
-  .from('places')
-  .select('*', { count: 'exact' });
+// Replace the existing query building logic with:
+const searchResults = await searchService.search({
+  searchQuery,
+  serviceFilter,
+  stateFilter,
+  cityFilter,
+  serviceCategories
+});
 
-// Apply search filter if there's a search query
-if (searchQuery) {
-  query = query.ilike('title', `%${searchQuery}%`);
-}
-
-// Apply service filter if selected
-if (serviceFilter) {
-  const selectedCategory = serviceCategories.find(cat => cat.id === serviceFilter);
-  console.log('Selected category:', selectedCategory);
-  if (selectedCategory) {
-    const filterConditions = selectedCategory.searchTerms.map(term => 
-      `category.ilike.%${term}%`
-    );
-    filterConditions.push(`category.ilike.%${selectedCategory.name}%`);
-    query = query.or(filterConditions.join(','));
-  }
-}
-
-// Apply location filters
-if (stateFilter) {
-  query = query.eq('province_state', stateFilter);
-}
-
-if (cityFilter && stateFilter) {
-  query = query.contains('city', [cityFilter]);
-}
-
-// Calculate pagination
-const from = (currentPage - 1) * itemsPerPage;
-const to = from + itemsPerPage - 1;
-
-// Execute the query with pagination
-const { data: places, error, count } = await query
-  .order('rating', { ascending: false })
-  .range(from, to);
-
-const totalPages = count ? Math.ceil(count / itemsPerPage) : 0;
+const { data: places, error, count, pagination } = searchResults;
 
 console.log('Query results:', { 
   count,
   currentPage,
-  totalPages,
+  totalPages: pagination.totalPages,
   error: error?.message,
-  firstFewResults: places?.slice(0, 3)
+  firstFewResults: places?.slice(0, 3),
+  totalResults: places?.length,
+  filters: {
+    state: stateFilter,
+    city: cityFilter,
+    service: serviceFilter,
+    search: searchQuery,
+    search_entry_ids: [1, 2, 3, 4]
+  }
 });
+
+// Log the actual locations of results for debugging
+if (places?.length) {
+  console.log('Result locations:', places.map(p => ({
+    title: p.title,
+    state: p.province_state,
+    cities: p.city,
+    search_entry_id: p.search_entry_id,
+    category: p.category
+  })));
+}
 
 // Get the selected category if there's a service filter
 const selectedCategory = serviceFilter 
@@ -258,7 +246,7 @@ const getPaginationUrl = (page: number) => {
         <SearchResults places={places || []} selectedCategory={selectedCategory} />
         
         {/* Pagination Controls */}
-        {totalPages > 1 && (
+        {pagination.totalPages > 1 && (
           <div class="flex justify-center gap-2 mt-8">
             {currentPage > 1 && (
               <a
@@ -269,10 +257,10 @@ const getPaginationUrl = (page: number) => {
             )}
             
             <span class="px-4 py-2 text-gray-600">
-              Page {currentPage} of {totalPages}
+              Page {currentPage} of {pagination.totalPages}
             </span>
 
-            {currentPage < totalPages && (
+            {currentPage < pagination.totalPages && (
               <a
                 href={getPaginationUrl(currentPage + 1)}
                 class="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700">

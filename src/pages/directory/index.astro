@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+
 import SearchResults from '../../components/directory/SearchResults.astro';
 import { supabase } from '../../lib/supabase';
 // @ts-ignore-unused-imports
@@ -31,6 +32,7 @@ const url = new URL(Astro.request.url);
 const searchQuery = url.searchParams.get('search') || '';
 const serviceFilter = url.searchParams.get('service') || '';
 const stateFilter = url.searchParams.get('state') || '';
+const cityFilter = url.searchParams.get('city') || '';
 const currentPage = parseInt(url.searchParams.get('page') || '1');
 const itemsPerPage = 12;
 
@@ -62,7 +64,7 @@ const serviceCategories = [
   },
 ];
 
-// Get all states and cities
+// Get all states and cities from places view
 const { data: locationData } = await supabase
   .from('places')
   .select('province_state, city')
@@ -103,17 +105,18 @@ try {
       (cat) => cat.id === serviceFilter
     );
     if (selectedCategory) {
-      const filterConditions = selectedCategory.searchTerms.map(
-        (term) => `category.ilike.%${term}%`
-      );
-      filterConditions.push(`category.ilike.%${selectedCategory.name}%`);
-      query = query.or(filterConditions.join(','));
+      query = query.ilike('category', `%${selectedCategory.name}%`);
     }
   }
 
   // Apply state filter
   if (stateFilter) {
     query = query.eq('province_state', stateFilter);
+  }
+
+  // Apply city filter
+  if (cityFilter) {
+    query = query.eq('city', cityFilter);
   }
 
   // Calculate pagination
@@ -200,6 +203,39 @@ const totalPages = searchResults.data
               }
             </select>
           </div>
+          <div class='w-48'>
+            <select
+              name='state'
+              id='state-select'
+              class='w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'>
+              <option value=''>All States</option>
+              {
+                states.map((state) => (
+                  <option value={state} selected={state === stateFilter}>
+                    {state}
+                  </option>
+                ))
+              }
+            </select>
+          </div>
+          <div class='w-48'>
+            <select
+              name='city'
+              id='city-select'
+              class='w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'>
+              <option value=''>All Cities</option>
+              {
+                stateFilter &&
+                  Array.from(locationsByState?.[stateFilter] || []).map(
+                    (city) => (
+                      <option value={city} selected={city === cityFilter}>
+                        {city}
+                      </option>
+                    )
+                  )
+              }
+            </select>
+          </div>
           <div class='w-32'>
             <button
               type='submit'
@@ -210,6 +246,28 @@ const totalPages = searchResults.data
         </div>
       </div>
     </form>
+
+    <script is:inline define:vars={{ locationsByState }}>
+      // Add client-side handling for state-city dependency
+      const stateSelect = document.getElementById('state-select');
+      const citySelect = document.getElementById('city-select');
+      const locationData = locationsByState;
+
+      stateSelect?.addEventListener('change', (event) => {
+        const selectedState = event.target.value;
+        if (citySelect) {
+          citySelect.innerHTML = '<option value="">All Cities</option>';
+          if (selectedState && locationData[selectedState]) {
+            Array.from(locationData[selectedState]).forEach((city) => {
+              const option = document.createElement('option');
+              option.value = String(city);
+              option.textContent = String(city);
+              citySelect.appendChild(option);
+            });
+          }
+        }
+      });
+    </script>
 
     {
       searchResults.error && (
@@ -231,29 +289,36 @@ const totalPages = searchResults.data
           />
 
           {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div class='flex justify-center gap-2 mt-8'>
-              {currentPage > 1 && (
-                <a
-                  href={getPaginationUrl(currentPage - 1)}
-                  class='px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700'>
-                  Previous
-                </a>
-              )}
+          {searchResults.pagination &&
+            searchResults.pagination.totalPages > 1 && (
+              <div class='flex justify-center gap-2 mt-8'>
+                {searchResults.pagination.currentPage > 1 && (
+                  <a
+                    href={getPaginationUrl(
+                      searchResults.pagination.currentPage - 1
+                    )}
+                    class='px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700'>
+                    Previous
+                  </a>
+                )}
 
-              <span class='px-4 py-2 text-gray-600'>
-                Page {currentPage} of {totalPages}
-              </span>
+                <span class='px-4 py-2 text-gray-600'>
+                  Page {searchResults.pagination.currentPage} of{' '}
+                  {searchResults.pagination.totalPages}
+                </span>
 
-              {currentPage < totalPages && (
-                <a
-                  href={getPaginationUrl(currentPage + 1)}
-                  class='px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700'>
-                  Next
-                </a>
-              )}
-            </div>
-          )}
+                {searchResults.pagination.currentPage <
+                  searchResults.pagination.totalPages && (
+                  <a
+                    href={getPaginationUrl(
+                      searchResults.pagination.currentPage + 1
+                    )}
+                    class='px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700'>
+                    Next
+                  </a>
+                )}
+              </div>
+            )}
         </>
       ) : (
         <>
