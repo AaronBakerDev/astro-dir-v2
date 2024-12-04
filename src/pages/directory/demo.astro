@@ -1,0 +1,392 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { supabase } from '../../../app_v2/src/lib/supabase';
+import SearchResults from '../../components/directory/SearchResults.astro';
+import type { PostgrestResponse } from '@supabase/supabase-js';
+
+interface SearchResult {
+  data: any[] | null;
+  error: {
+    message: string;
+  } | null;
+}
+
+// Get sample data for demonstration
+const { data: sampleState } = await supabase
+  .from('places')
+  .select('province_state')
+  .limit(1)
+  .single();
+
+const { data: sampleCity } = await supabase
+  .from('places')
+  .select('city')
+  .limit(1)
+  .single();
+
+const sampleStateValue = sampleState?.province_state || 'Tennessee';
+const sampleCityValue = sampleCity?.city?.[0] || 'Knoxville';
+
+// Service categories for demo
+const serviceCategories = [
+  {
+    id: 'masonry-contractors',
+    name: 'Masonry Contractors',
+    description: 'Expert masonry services for your home or business',
+    searchTerms: ['Masonry', 'Mason', 'Brick', 'Stone', 'Contractor'],
+  },
+  {
+    id: 'chimney-repair',
+    name: 'Chimney Repair',
+    description: 'Professional chimney repair and maintenance services',
+    searchTerms: ['Chimney', 'Sweep', 'Repair', 'Maintenance'],
+  },
+];
+
+// Get all states for the dropdown
+const { data: states } = await supabase
+  .from('places')
+  .select('province_state')
+  .not('province_state', 'is', null);
+
+const uniqueStates = [...new Set(states?.map((s) => s.province_state))].sort();
+
+// Get cities for the sample state
+const { data: cities } = await supabase
+  .from('places')
+  .select('city')
+  .eq('province_state', sampleStateValue)
+  .not('city', 'is', null);
+
+const uniqueCities = [...new Set(cities?.flatMap((c) => c.city || []))].sort();
+
+// Demo queries for each URL pattern
+const stateResults = await supabase
+  .from('places')
+  .select('*')
+  .eq('province_state', sampleStateValue)
+  .limit(3);
+
+const cityResults = await supabase
+  .from('places')
+  .select('*')
+  .eq('province_state', sampleStateValue)
+  .contains('city', [sampleCityValue])
+  .limit(3);
+
+const categoryResults = await supabase
+  .from('places')
+  .select('*')
+  .or(
+    serviceCategories[0].searchTerms
+      .map((term) => `category.ilike.%${term}%`)
+      .join(',')
+  )
+  .limit(3);
+
+// Generate demo URLs
+const demoUrls = [
+  {
+    type: 'State Page',
+    url: `/directory/${sampleStateValue}`,
+    description: 'View all professionals in a state',
+    example: `Shows all chimney professionals in ${sampleStateValue}`,
+    results: stateResults.data || [],
+  },
+  {
+    type: 'City Page',
+    url: `/directory/${sampleStateValue}/${sampleCityValue}`,
+    description: 'View professionals in a specific city',
+    example: `Shows chimney professionals in ${sampleCityValue}, ${sampleStateValue}`,
+    results: cityResults.data || [],
+  },
+  {
+    type: 'Service Category',
+    url: '/directory/services/masonry-contractors',
+    description: 'View professionals by service type',
+    example: 'Shows all masonry contractors across locations',
+    results: categoryResults.data || [],
+  },
+];
+
+// Generate breadcrumb example
+const breadcrumbExample = [
+  { label: 'Directory', url: '/directory' },
+  { label: sampleStateValue, url: `/directory/${sampleStateValue}` },
+  {
+    label: sampleCityValue,
+    url: `/directory/${sampleStateValue}/${sampleCityValue}`,
+  },
+  { label: 'Masonry Contractors', url: '#' },
+];
+
+// Handle form submission
+const url = new URL(Astro.request.url);
+const searchQuery = url.searchParams.get('search') || '';
+const selectedState = url.searchParams.get('state') || '';
+const selectedCity = url.searchParams.get('city') || '';
+const selectedService = url.searchParams.get('service') || '';
+
+// Build search query if parameters exist
+let searchResults: SearchResult = { data: null, error: null };
+
+try {
+  if (searchQuery || selectedState || selectedCity || selectedService) {
+    let query = supabase.from('places').select('*');
+
+    if (searchQuery) {
+      query = query.ilike('title', `%${searchQuery}%`);
+    }
+
+    if (selectedState) {
+      query = query.eq('province_state', selectedState);
+    }
+
+    if (selectedCity) {
+      query = query.contains('city', [selectedCity]);
+    }
+
+    if (selectedService) {
+      const category = serviceCategories.find(
+        (cat) => cat.id === selectedService
+      );
+      if (category) {
+        const filterConditions = category.searchTerms.map(
+          (term) => `category.ilike.%${term}%`
+        );
+        query = query.or(filterConditions.join(','));
+      }
+    }
+
+    const response = await query;
+    searchResults = {
+      data: response.data,
+      error: response.error ? { message: response.error.message } : null,
+    };
+  }
+} catch (error) {
+  searchResults = {
+    data: null,
+    error: { message: 'An unexpected error occurred' },
+  };
+}
+---
+
+<Layout title='Directory Structure Demo'>
+  <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
+    <div class='mb-8'>
+      <h1 class='text-4xl font-bold text-gray-900 mb-3'>
+        New Directory Structure Demo
+      </h1>
+      <p class='text-lg text-gray-600'>
+        Preview of the new URL structure and navigation with live data
+      </p>
+    </div>
+
+    <!-- Search Form Demo -->
+    <section class='mb-12'>
+      <h2 class='text-2xl font-semibold mb-6'>Live Search Demo</h2>
+      <form class='space-y-4' method='get'>
+        <div class='grid md:grid-cols-2 lg:grid-cols-4 gap-4'>
+          <input
+            type='search'
+            name='search'
+            value={searchQuery}
+            placeholder='Search professionals...'
+            class='w-full px-4 py-2 rounded-lg border border-gray-300'
+          />
+          <select
+            name='state'
+            class='w-full px-4 py-2 rounded-lg border border-gray-300'
+            id='stateSelect'>
+            <option value=''>Select State</option>
+            {
+              uniqueStates.map((state) => (
+                <option value={state} selected={state === selectedState}>
+                  {state}
+                </option>
+              ))
+            }
+          </select>
+          <select
+            name='city'
+            class='w-full px-4 py-2 rounded-lg border border-gray-300'
+            disabled={!selectedState}
+            id='citySelect'>
+            <option value=''>Select City</option>
+            {
+              uniqueCities.map((city) => (
+                <option value={city} selected={city === selectedCity}>
+                  {city}
+                </option>
+              ))
+            }
+          </select>
+          <select
+            name='service'
+            class='w-full px-4 py-2 rounded-lg border border-gray-300'>
+            <option value=''>Select Service</option>
+            {
+              serviceCategories.map((category) => (
+                <option
+                  value={category.id}
+                  selected={category.id === selectedService}>
+                  {category.name}
+                </option>
+              ))
+            }
+          </select>
+        </div>
+        <button
+          type='submit'
+          class='px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors'>
+          Search
+        </button>
+      </form>
+
+      {
+        searchResults.error && (
+          <div class='mt-4 p-4 bg-red-50 text-red-700 rounded-lg'>
+            Error: {searchResults.error.message}
+          </div>
+        )
+      }
+
+      {
+        searchResults.data && (
+          <div class='mt-8'>
+            <h3 class='text-xl font-semibold mb-4'>Search Results</h3>
+            <SearchResults
+              places={searchResults.data}
+              selectedCategory={serviceCategories.find(
+                (cat) => cat.id === selectedService
+              )}
+            />
+          </div>
+        )
+      }
+    </section>
+
+    <!-- URL Structure Examples with Live Data -->
+    <section class='mb-12'>
+      <h2 class='text-2xl font-semibold mb-6'>
+        URL Structure Examples (with sample data)
+      </h2>
+      <div class='grid gap-6'>
+        {
+          demoUrls.map((demo) => (
+            <div class='bg-white p-6 rounded-lg border border-gray-200'>
+              <h3 class='font-semibold text-lg mb-2'>{demo.type}</h3>
+              <div class='bg-gray-50 p-3 rounded mb-3 font-mono text-sm'>
+                {demo.url}
+              </div>
+              <p class='text-gray-600 mb-2'>{demo.description}</p>
+              <p class='text-sm text-gray-500 mb-4'>Example: {demo.example}</p>
+
+              <div class='border-t pt-4'>
+                <h4 class='font-medium mb-2'>Sample Results:</h4>
+                {demo.results.length > 0 ? (
+                  <div class='space-y-2'>
+                    {demo.results.map((result) => (
+                      <div class='bg-gray-50 p-2 rounded'>
+                        <p class='font-medium'>{result.title}</p>
+                        <p class='text-sm text-gray-600'>
+                          {result.city?.join(', ')} - {result.province_state}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p class='text-gray-500 italic'>No results found</p>
+                )}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- Breadcrumb Demo -->
+    <section class='mb-12'>
+      <h2 class='text-2xl font-semibold mb-6'>Breadcrumb Navigation</h2>
+      <nav class='flex items-center space-x-2 text-gray-600'>
+        {
+          breadcrumbExample.map((item, index) => (
+            <>
+              {index > 0 && <span class='text-gray-400'>/</span>}
+              <a
+                href={item.url}
+                class={`hover:text-red-600 ${index === breadcrumbExample.length - 1 ? 'text-gray-900 font-semibold' : ''}`}>
+                {item.label}
+              </a>
+            </>
+          ))
+        }
+      </nav>
+    </section>
+
+    <!-- Meta Tags Demo -->
+    <section class='mb-12'>
+      <h2 class='text-2xl font-semibold mb-6'>SEO Meta Tags Example</h2>
+      <div class='bg-white p-6 rounded-lg border border-gray-200'>
+        <pre
+          class='bg-gray-50 p-4 rounded overflow-x-auto'>
+{`<!-- Example meta tags for ${sampleCityValue}, ${sampleStateValue} page -->
+<title>Find Local Chimney Professionals in ${sampleCityValue}, ${sampleStateValue}</title>
+<meta name="description" content="Find trusted chimney professionals in ${sampleCityValue}, ${sampleStateValue}. Expert masonry, repair, and maintenance services.">
+<link rel="canonical" href="/directory/${sampleStateValue}/${sampleCityValue}">`}
+        </pre>
+      </div>
+    </section>
+
+    <!-- Implementation Notes -->
+    <section>
+      <h2 class='text-2xl font-semibold mb-6'>Implementation Notes</h2>
+      <div class='prose max-w-none'>
+        <ul class='list-disc pl-5 space-y-2'>
+          <li>
+            All URLs follow a logical hierarchy: /directory/[state]/[city]
+          </li>
+          <li>
+            Service categories can be accessed directly or combined with
+            location
+          </li>
+          <li>
+            Search parameters maintain clean URLs while allowing filtering
+          </li>
+          <li>Breadcrumb navigation reflects the URL structure</li>
+          <li>Meta tags are dynamically generated based on the current view</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+</Layout>
+
+<style>
+  .prose ul li {
+    @apply text-gray-600;
+  }
+</style>
+
+<script>
+  // Add client-side handling for state/city relationship
+  document.addEventListener('DOMContentLoaded', () => {
+    const stateSelect = document.querySelector(
+      '#stateSelect'
+    ) as HTMLSelectElement;
+    const citySelect = document.querySelector(
+      '#citySelect'
+    ) as HTMLSelectElement;
+
+    if (stateSelect && citySelect) {
+      stateSelect.addEventListener('change', () => {
+        citySelect.value = '';
+        if (!stateSelect.value) {
+          citySelect.disabled = true;
+        } else {
+          citySelect.disabled = false;
+        }
+      });
+    }
+  });
+</script>

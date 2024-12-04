@@ -1,0 +1,85 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { supabase } from '../../../app_v2/src/lib/supabase';
+import SearchForm from '../../components/directory/SearchForm.astro';
+import SearchResults from '../../components/directory/SearchResults.astro';
+
+// Get search params
+const url = new URL(Astro.request.url);
+const searchQuery = url.searchParams.get('search') || '';
+const selectedServiceId = url.searchParams.get('service') || '';
+
+// Service categories mapping
+const serviceCategories = [
+  {
+    id: 'masonry-contractors',
+    name: 'Masonry Contractors',
+    description: 'Expert masonry services for your home or business',
+  },
+  {
+    id: 'chimney-repair',
+    name: 'Chimney Repair',
+    description: 'Professional chimney repair and maintenance services',
+  },
+  {
+    id: 'roofing-services',
+    name: 'Roofing Services',
+    description: 'Specialized roofing and chimney flashing repairs',
+  },
+  {
+    id: 'brick-repair',
+    name: 'Brick Repair',
+    description: 'Expert brick repair and restoration services',
+  },
+];
+
+// Get selected category
+const selectedCategory = serviceCategories.find(
+  (cat) => cat.id === selectedServiceId
+);
+
+// Build the query
+let query = supabase.from('query_places_view').select('*');
+
+// Apply search if provided
+if (searchQuery) {
+  query = query.ilike('title', `%${searchQuery}%`);
+}
+
+// Apply service filter if selected
+if (selectedCategory) {
+  query = query.eq('category', selectedCategory.name);
+}
+
+const { data: places, error } = await query;
+
+console.log('Search results:', { places, error });
+---
+
+<Layout title='Search Results | Find Local Chimney Professionals'>
+  <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
+    <nav class='mb-8'>
+      <a
+        href='/directory'
+        class='text-red-600 hover:text-red-700 flex items-center gap-1'>
+        <span>←</span> Back to Directory
+      </a>
+    </nav>
+
+    <SearchForm
+      searchQuery={searchQuery}
+      selectedServiceId={selectedServiceId}
+      serviceCategories={serviceCategories}
+    />
+
+    {
+      error && (
+        <div class='p-4 bg-red-50 text-red-600 rounded-lg'>
+          Error loading professionals: {error.message}
+        </div>
+      )
+    }
+
+    <SearchResults places={places || []} selectedCategory={selectedCategory} />
+  </div>
+</Layout>

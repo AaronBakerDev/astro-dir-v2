@@ -1,0 +1,295 @@
+---
+import Layout from '../../../../layouts/Layout.astro';
+import SearchResults from '../../../../components/directory/SearchResults.astro';
+import { supabase } from '../../../../../app_v2/src/lib/supabase';
+import type { PostgrestResponse } from '@supabase/supabase-js';
+
+interface SearchResult {
+  data: any[] | null;
+  error: {
+    message: string;
+  } | null;
+}
+
+// Get category from params
+const { category } = Astro.params;
+
+// Get search params
+const url = new URL(Astro.request.url);
+const searchQuery = url.searchParams.get('search') || '';
+const stateFilter = url.searchParams.get('state') || '';
+const cityFilter = url.searchParams.get('city') || '';
+const currentPage = parseInt(url.searchParams.get('page') || '1');
+const itemsPerPage = 12;
+
+// Service categories with their descriptions
+const serviceCategories = [
+  {
+    id: 'masonry-contractors',
+    name: 'Masonry Contractors',
+    description: 'Expert masonry services for your home or business',
+    searchTerms: ['Masonry', 'Mason', 'Brick', 'Stone', 'Contractor'],
+  },
+  {
+    id: 'chimney-repair',
+    name: 'Chimney Repair',
+    description: 'Professional chimney repair and maintenance services',
+    searchTerms: ['Chimney', 'Sweep', 'Repair', 'Maintenance'],
+  },
+  {
+    id: 'roofing-services',
+    name: 'Roofing Services',
+    description: 'Specialized roofing and chimney flashing repairs',
+    searchTerms: ['Roof', 'Roofing', 'Contractor', 'Construction'],
+  },
+  {
+    id: 'brick-repair',
+    name: 'Brick Repair',
+    description: 'Expert brick repair and restoration services',
+    searchTerms: ['Brick', 'Mason', 'Repair', 'Restoration'],
+  },
+];
+
+// Get the selected category
+const selectedCategory = serviceCategories.find((cat) => cat.id === category);
+
+if (!selectedCategory) {
+  return new Response('Category not found', { status: 404 });
+}
+
+// Get all states and cities
+const { data: locationData } = await supabase
+  .from('places')
+  .select('province_state, city')
+  .not('province_state', 'is', null)
+  .not('city', 'is', null);
+
+// Process location data into a structured format
+const locationsByState = locationData?.reduce(
+  (acc, item) => {
+    if (item.province_state && item.city) {
+      if (!acc[item.province_state]) {
+        acc[item.province_state] = new Set();
+      }
+      item.city.forEach((city: string) => acc[item.province_state].add(city));
+    }
+    return acc;
+  },
+  {} as Record<string, Set<string>>
+);
+
+// Get sorted states
+const states = Object.keys(locationsByState || {}).sort();
+
+// Get cities for selected state
+const availableCities =
+  stateFilter && locationsByState?.[stateFilter]
+    ? Array.from(locationsByState[stateFilter]).sort()
+    : [];
+
+// Build and execute the query
+let searchResults: SearchResult = { data: null, error: null };
+
+try {
+  let query = supabase.from('places').select('*', { count: 'exact' });
+
+  // Apply category filter
+  const filterConditions = selectedCategory.searchTerms.map(
+    (term) => `category.ilike.%${term}%`
+  );
+  filterConditions.push(`category.ilike.%${selectedCategory.name}%`);
+  query = query.or(filterConditions.join(','));
+
+  if (searchQuery) {
+    query = query.ilike('title', `%${searchQuery}%`);
+  }
+
+  if (stateFilter) {
+    query = query.eq('province_state', stateFilter);
+  }
+
+  if (cityFilter && stateFilter) {
+    query = query.contains('city', [cityFilter]);
+  }
+
+  // Calculate pagination
+  const from = (currentPage - 1) * itemsPerPage;
+  const to = from + itemsPerPage - 1;
+
+  // Execute the query with pagination
+  const response = await query
+    .order('rating', { ascending: false })
+    .range(from, to);
+
+  searchResults = {
+    data: response.data,
+    error: response.error ? { message: response.error.message } : null,
+  };
+} catch (error) {
+  searchResults = {
+    data: null,
+    error: { message: 'An unexpected error occurred' },
+  };
+}
+
+// Helper function to generate pagination URL
+const getPaginationUrl = (page: number) => {
+  const params = new URLSearchParams(url.searchParams);
+  params.set('page', page.toString());
+  return `?${params.toString()}`;
+};
+
+// Calculate total pages
+const totalPages = searchResults.data
+  ? Math.ceil(searchResults.data.length / itemsPerPage)
+  : 0;
+---
+
+<Layout title={`Find ${selectedCategory.name} Near You`}>
+  <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12'>
+    <!-- Breadcrumb -->
+    <nav class='flex items-center space-x-2 text-gray-600 mb-8'>
+      <a href='/directory' class='hover:text-red-600'>Directory</a>
+      <span class='text-gray-400'>/</span>
+      <a href='/directory/services' class='hover:text-red-600'>Services</a>
+      <span class='text-gray-400'>/</span>
+      <span class='text-gray-900 font-semibold'>{selectedCategory.name}</span>
+    </nav>
+
+    <div class='mb-8'>
+      <h1 class='text-4xl font-bold text-gray-900 mb-3'>
+        Find {selectedCategory.name} Near You
+      </h1>
+      <p class='text-lg text-gray-600'>
+        {selectedCategory.description}
+      </p>
+    </div>
+
+    <!-- Search Form -->
+    <form class='mb-12' method='get'>
+      <div class='flex flex-col gap-4'>
+        <!-- Search Row -->
+        <div class='flex gap-4'>
+          <div class='flex-1'>
+            <input
+              type='search'
+              name='search'
+              value={searchQuery}
+              placeholder={`Search for ${selectedCategory.name.toLowerCase()}...`}
+              class='w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+            />
+          </div>
+        </div>
+
+        <!-- Location Filters Row -->
+        <div class='flex gap-4'>
+          <div class='flex-1'>
+            <select
+              name='state'
+              id='stateSelect'
+              class='w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'>
+              <option value=''>All States/Provinces</option>
+              {
+                states.map((state) => (
+                  <option value={state} selected={state === stateFilter}>
+                    {state}
+                  </option>
+                ))
+              }
+            </select>
+          </div>
+          <div class='flex-1'>
+            <select
+              name='city'
+              id='citySelect'
+              class='w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500'
+              disabled={!stateFilter}>
+              <option value=''>All Cities</option>
+              {
+                availableCities.map((city) => (
+                  <option value={city} selected={city === cityFilter}>
+                    {city}
+                  </option>
+                ))
+              }
+            </select>
+          </div>
+          <div class='w-32'>
+            <button
+              type='submit'
+              class='w-full px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors'>
+              Search
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    {
+      searchResults.error && (
+        <div class='bg-red-50 border border-red-200 rounded-lg p-4 mb-8'>
+          <p class='text-red-700'>
+            Error loading professionals: {searchResults.error.message}
+          </p>
+        </div>
+      )
+    }
+
+    <SearchResults
+      places={searchResults.data || []}
+      selectedCategory={selectedCategory}
+    />
+
+    {/* Pagination Controls */}
+    {
+      totalPages > 1 && (
+        <div class='flex justify-center gap-2 mt-8'>
+          {currentPage > 1 && (
+            <a
+              href={getPaginationUrl(currentPage - 1)}
+              class='px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700'>
+              Previous
+            </a>
+          )}
+
+          <span class='px-4 py-2 text-gray-600'>
+            Page {currentPage} of {totalPages}
+          </span>
+
+          {currentPage < totalPages && (
+            <a
+              href={getPaginationUrl(currentPage + 1)}
+              class='px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700'>
+              Next
+            </a>
+          )}
+        </div>
+      )
+    }
+  </div>
+</Layout>
+
+<script>
+  // Add client-side handling for state/city relationship
+  document.addEventListener('DOMContentLoaded', () => {
+    const stateSelect = document.querySelector(
+      '#stateSelect'
+    ) as HTMLSelectElement;
+    const citySelect = document.querySelector(
+      '#citySelect'
+    ) as HTMLSelectElement;
+
+    if (stateSelect && citySelect) {
+      stateSelect.addEventListener('change', () => {
+        citySelect.value = '';
+        if (!stateSelect.value) {
+          citySelect.disabled = true;
+        } else {
+          citySelect.disabled = false;
+        }
+        stateSelect.form?.submit();
+      });
+    }
+  });
+</script>
+

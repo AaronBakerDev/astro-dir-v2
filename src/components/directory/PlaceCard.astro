@@ -1,0 +1,57 @@
+---
+import { generateSlug } from '../../utils/slugUtils';
+
+interface Props {
+  place: {
+    id: number;
+    title: string;
+    category?: string;
+    rating?: number;
+    rating_count?: number;
+    address?: string;
+    city?: string;
+    province_state?: string;
+    phone_number?: string;
+    slug?: string;
+  };
+}
+
+const { place } = Astro.props;
+const slug = place.slug || generateSlug(place.title, place.id);
+---
+
+<a
+  href={`/places/${slug}`}
+  class='block bg-white rounded-lg border border-gray-200 p-6 hover:shadow-sm transition-all'>
+  <h3 class='text-xl font-semibold text-gray-900 mb-2'>{place.title}</h3>
+
+  {place.category && <p class='text-red-600 text-sm mb-2'>{place.category}</p>}
+
+  {
+    place.rating && (
+      <div class='flex items-center gap-1 mb-2'>
+        <span class='text-yellow-400'>★</span>
+        <span class='text-gray-700'>{place.rating.toFixed(1)}</span>
+        {place.rating_count && (
+          <span class='text-gray-500 text-sm'>
+            ({place.rating_count} reviews)
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  <p class='text-gray-600 text-sm mb-2'>
+    {
+      place.address
+        ? place.address
+        : [place.city, place.province_state].filter(Boolean).join(', ')
+    }
+  </p>
+
+  {
+    place.phone_number && (
+      <p class='text-gray-600 text-sm'>{place.phone_number}</p>
+    )
+  }
+</a>

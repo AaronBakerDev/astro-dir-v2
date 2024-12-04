@@ -1,0 +1,57 @@
+---
+import PlaceCard from './PlaceCard.astro';
+
+type Place = {
+  id: number;
+  title: string;
+  category?: string;
+  rating?: number;
+  rating_count?: number;
+  address?: string;
+  city?: string;
+  province_state?: string;
+  phone_number?: string;
+  slug?: string;
+};
+
+type Category = {
+  id: string;
+  name: string;
+  description: string;
+};
+
+interface Props {
+  places: Place[];
+  selectedCategory?: Category;
+  totalCount?: number;
+}
+
+const { places, selectedCategory, totalCount } = Astro.props;
+const displayCount = totalCount ?? places.length;
+---
+
+<div class='mt-8'>
+  <div class='flex justify-between items-center mb-6'>
+    <h2 class='text-2xl font-semibold'>
+      {selectedCategory ? selectedCategory.name : 'Search Results'}
+    </h2>
+    <span class='text-gray-600'>
+      {displayCount}
+      {displayCount === 1 ? 'result' : 'results'} found
+    </span>
+  </div>
+
+  {
+    places && places.length === 0 ? (
+      <p class='text-gray-600'>
+        No professionals found matching your search criteria.
+      </p>
+    ) : (
+      <div class='grid md:grid-cols-2 lg:grid-cols-3 gap-6'>
+        {places?.map((place) => (
+          <PlaceCard place={place} />
+        ))}
+      </div>
+    )
+  }
+</div>

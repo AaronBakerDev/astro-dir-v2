@@ -12,6 +12,8 @@ export function extractIdFromSlug(slug: string | undefined): number | null {
 export function generateSlug(title: string, id: number): string {
   return `${title
     .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '')}-${id}`;
 }

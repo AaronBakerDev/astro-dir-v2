@@ -1,19 +1,102 @@
 ---
 import Layout from '../layouts/Layout.astro';
+
+const siteTitle = 'ChimneyRepairPro';
 ---
 
-<Layout title='Welcome to Places Directory'>
-  <div class='max-w-3xl mx-auto text-center'>
-    <h1 class='text-4xl font-bold text-gray-900 mb-6'>
-      Welcome to Places Directory
-    </h1>
-    <p class='text-lg text-gray-600 mb-8'>
-      Discover and explore amazing places in your area.
+<Layout title={siteTitle}>
+  <!-- Hero Section -->
+  <section class='text-center py-20'>
+    <h1 class='text-5xl font-bold mb-6'>Professional Chimney Services</h1>
+    <p class='text-gray-600 text-lg mb-10 max-w-2xl mx-auto'>
+      Expert chimney repair and maintenance services. Available 24/7 for
+      emergencies.
     </p>
-    <a
-      href='/directory'
-      class='inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 transition-colors'>
-      View Directory
-    </a>
-  </div>
+    <div class='flex gap-4 justify-center'>
+      <a
+        href='/emergency'
+        class='bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 inline-flex items-center'>
+        Emergency Service →
+      </a>
+      <a
+        href='/directory'
+        class='bg-gray-900 text-white px-6 py-3 rounded-lg hover:bg-gray-800'>
+        Find a Provider
+      </a>
+    </div>
+  </section>
+
+  <!-- Services Section -->
+  <section class='py-20'>
+    <h2 class='text-4xl font-bold text-center mb-16'>Our Services</h2>
+    <div class='grid md:grid-cols-2 gap-8 max-w-6xl mx-auto px-4'>
+      <div class='bg-white p-8 rounded-lg shadow-sm border border-gray-200'>
+        <h3 class='text-2xl font-semibold mb-4'>Masonry Contractors</h3>
+        <p class='text-gray-600 mb-6'>
+          Expert masonry services for your home or business
+        </p>
+        <a
+          href='/directory?service=masonry-contractors'
+          class='text-red-600 hover:text-red-700 font-medium inline-flex items-center'>
+          Find Providers →
+        </a>
+      </div>
+
+      <div class='bg-white p-8 rounded-lg shadow-sm border border-gray-200'>
+        <h3 class='text-2xl font-semibold mb-4'>Chimney Repair</h3>
+        <p class='text-gray-600 mb-6'>
+          Professional chimney repair and maintenance services
+        </p>
+        <a
+          href='/directory?service=chimney-repair'
+          class='text-red-600 hover:text-red-700 font-medium inline-flex items-center'>
+          Find Providers →
+        </a>
+      </div>
+
+      <div class='bg-white p-8 rounded-lg shadow-sm border border-gray-200'>
+        <h3 class='text-2xl font-semibold mb-4'>Roofing Services</h3>
+        <p class='text-gray-600 mb-6'>
+          Specialized roofing and chimney flashing repairs
+        </p>
+        <a
+          href='/directory?service=roofing-services'
+          class='text-red-600 hover:text-red-700 font-medium inline-flex items-center'>
+          Find Providers →
+        </a>
+      </div>
+
+      <div class='bg-white p-8 rounded-lg shadow-sm border border-gray-200'>
+        <h3 class='text-2xl font-semibold mb-4'>Brick Repair</h3>
+        <p class='text-gray-600 mb-6'>
+          Expert brick repair and restoration services
+        </p>
+        <a
+          href='/directory?service=brick-repair'
+          class='text-red-600 hover:text-red-700 font-medium inline-flex items-center'>
+          Find Providers →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class='py-20 text-center'>
+    <h2 class='text-4xl font-bold mb-4'>Need Help With Your Chimney?</h2>
+    <p class='text-gray-600 mb-8'>
+      Our certified technicians are ready to help
+    </p>
+    <div class='flex gap-4 justify-center'>
+      <a
+        href='/directory'
+        class='bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700'>
+        Find a Provider
+      </a>
+      <a
+        href='/contact'
+        class='border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50'>
+        Contact Us
+      </a>
+    </div>
+  </section>
 </Layout>
