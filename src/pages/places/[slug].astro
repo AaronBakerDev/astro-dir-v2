@@ -13,7 +13,7 @@ let query = supabase.from('places').select('*');
 if (isNumeric) {
   query = query.eq('id', parseInt(slug || '0'));
 } else {
-  query = query.eq('slug', `"${slug}"`);
+  query = query.eq('slug', slug);
 }
 
 const { data: place, error } = await query.single();
