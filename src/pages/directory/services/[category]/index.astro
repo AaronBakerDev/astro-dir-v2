@@ -1,7 +1,8 @@
 ---
 import Layout from '../../../../layouts/Layout.astro';
 import SearchResults from '../../../../components/directory/SearchResults.astro';
-import { supabase } from '../../../../../app_v2/src/lib/supabase';
+import { supabase } from '../../../../lib/supabase';
+// @ts-ignore-unused-imports
 import type { PostgrestResponse } from '@supabase/supabase-js';
 
 interface SearchResult {
@@ -292,4 +293,3 @@ const totalPages = searchResults.data
     }
   });
 </script>
-

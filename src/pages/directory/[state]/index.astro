@@ -2,11 +2,13 @@
 import Layout from '../../../layouts/Layout.astro';
 import SearchResults from '../../../components/directory/SearchResults.astro';
 import Pagination from '../../../components/directory/Pagination.astro';
-import { supabase } from '../../../../app_v2/src/lib/supabase';
+import { supabase } from '../../../lib/supabase';
 import {
   paginateQuery,
   generatePaginationLinks,
 } from '../../../lib/pagination';
+// @ts-ignore-unused-imports
+import type { PostgrestResponse } from '@supabase/supabase-js';
 
 interface SearchResult {
   data: any[] | null;

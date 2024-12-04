@@ -1,34 +1,76 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { supabase } from '../../../app_v2/src/lib/supabase';
+import { supabase } from '../../lib/supabase';
 import SearchResults from '../../components/directory/SearchResults.astro';
+// @ts-ignore-unused-imports
 import type { PostgrestResponse } from '@supabase/supabase-js';
 
+interface Place {
+  id: number;
+  title: string;
+  category: string;
+  province_state: string;
+  city: string[];
+  rating?: number;
+}
+
 interface SearchResult {
-  data: any[] | null;
+  data: Place[] | null;
   error: {
     message: string;
   } | null;
 }
 
+interface DemoUrl {
+  type: string;
+  url: string;
+  description: string;
+  example: string;
+  results: Place[];
+}
+
+interface ServiceCategory {
+  id: string;
+  name: string;
+  description: string;
+  searchTerms: string[];
+}
+
 // Get sample data for demonstration
-const { data: sampleState } = await supabase
-  .from('places')
-  .select('province_state')
-  .limit(1)
-  .single();
+let sampleStateValue = 'Tennessee';
+let sampleCityValue = 'Knoxville';
 
-const { data: sampleCity } = await supabase
-  .from('places')
-  .select('city')
-  .limit(1)
-  .single();
+try {
+  const { data: sampleState, error: stateError } = await supabase
+    .from('places')
+    .select('province_state')
+    .not('province_state', 'is', null)
+    .limit(1)
+    .single();
 
-const sampleStateValue = sampleState?.province_state || 'Tennessee';
-const sampleCityValue = sampleCity?.city?.[0] || 'Knoxville';
+  if (stateError) throw stateError;
+  if (sampleState?.province_state) {
+    sampleStateValue = sampleState.province_state;
+  }
+
+  const { data: sampleCity, error: cityError } = await supabase
+    .from('places')
+    .select('city')
+    .eq('province_state', sampleStateValue)
+    .not('city', 'is', null)
+    .limit(1)
+    .single();
+
+  if (cityError) throw cityError;
+  if (sampleCity?.city?.[0]) {
+    sampleCityValue = sampleCity.city[0];
+  }
+} catch (error) {
+  console.error('Error fetching sample data:', error);
+}
 
 // Service categories for demo
-const serviceCategories = [
+const serviceCategories: ServiceCategory[] = [
   {
     id: 'masonry-contractors',
     name: 'Masonry Contractors',
@@ -44,70 +86,92 @@ const serviceCategories = [
 ];
 
 // Get all states for the dropdown
-const { data: states } = await supabase
-  .from('places')
-  .select('province_state')
-  .not('province_state', 'is', null);
+let uniqueStates: string[] = [];
+try {
+  const { data: states, error: statesError } = await supabase
+    .from('places')
+    .select('province_state')
+    .not('province_state', 'is', null);
 
-const uniqueStates = [...new Set(states?.map((s) => s.province_state))].sort();
+  if (statesError) throw statesError;
+  uniqueStates = [
+    ...new Set(states?.map((s) => s.province_state) || []),
+  ].sort();
+} catch (error) {
+  console.error('Error fetching states:', error);
+}
 
 // Get cities for the sample state
-const { data: cities } = await supabase
-  .from('places')
-  .select('city')
-  .eq('province_state', sampleStateValue)
-  .not('city', 'is', null);
+let uniqueCities: string[] = [];
+try {
+  const { data: cities, error: citiesError } = await supabase
+    .from('places')
+    .select('city')
+    .eq('province_state', sampleStateValue)
+    .not('city', 'is', null);
 
-const uniqueCities = [...new Set(cities?.flatMap((c) => c.city || []))].sort();
+  if (citiesError) throw citiesError;
+  uniqueCities = [...new Set(cities?.flatMap((c) => c.city || []))].sort();
+} catch (error) {
+  console.error('Error fetching cities:', error);
+}
 
 // Demo queries for each URL pattern
-const stateResults = await supabase
-  .from('places')
-  .select('*')
-  .eq('province_state', sampleStateValue)
-  .limit(3);
+let demoUrls: DemoUrl[] = [];
+try {
+  const [stateResults, cityResults, categoryResults] = await Promise.all([
+    supabase
+      .from('places')
+      .select('*')
+      .eq('province_state', sampleStateValue)
+      .limit(3),
+    supabase
+      .from('places')
+      .select('*')
+      .eq('province_state', sampleStateValue)
+      .contains('city', [sampleCityValue])
+      .limit(3),
+    supabase
+      .from('places')
+      .select('*')
+      .or(
+        serviceCategories[0].searchTerms
+          .map((term) => `category.ilike.%${term}%`)
+          .join(',')
+      )
+      .limit(3),
+  ]);
 
-const cityResults = await supabase
-  .from('places')
-  .select('*')
-  .eq('province_state', sampleStateValue)
-  .contains('city', [sampleCityValue])
-  .limit(3);
+  if (stateResults.error) throw stateResults.error;
+  if (cityResults.error) throw cityResults.error;
+  if (categoryResults.error) throw categoryResults.error;
 
-const categoryResults = await supabase
-  .from('places')
-  .select('*')
-  .or(
-    serviceCategories[0].searchTerms
-      .map((term) => `category.ilike.%${term}%`)
-      .join(',')
-  )
-  .limit(3);
-
-// Generate demo URLs
-const demoUrls = [
-  {
-    type: 'State Page',
-    url: `/directory/${sampleStateValue}`,
-    description: 'View all professionals in a state',
-    example: `Shows all chimney professionals in ${sampleStateValue}`,
-    results: stateResults.data || [],
-  },
-  {
-    type: 'City Page',
-    url: `/directory/${sampleStateValue}/${sampleCityValue}`,
-    description: 'View professionals in a specific city',
-    example: `Shows chimney professionals in ${sampleCityValue}, ${sampleStateValue}`,
-    results: cityResults.data || [],
-  },
-  {
-    type: 'Service Category',
-    url: '/directory/services/masonry-contractors',
-    description: 'View professionals by service type',
-    example: 'Shows all masonry contractors across locations',
-    results: categoryResults.data || [],
-  },
-];
+  demoUrls = [
+    {
+      type: 'State Page',
+      url: `/directory/${sampleStateValue}`,
+      description: 'View all professionals in a state',
+      example: `Shows all chimney professionals in ${sampleStateValue}`,
+      results: stateResults.data || [],
+    },
+    {
+      type: 'City Page',
+      url: `/directory/${sampleStateValue}/${sampleCityValue}`,
+      description: 'View professionals in a specific city',
+      example: `Shows chimney professionals in ${sampleCityValue}, ${sampleStateValue}`,
+      results: cityResults.data || [],
+    },
+    {
+      type: 'Service Category',
+      url: '/directory/services/masonry-contractors',
+      description: 'View professionals by service type',
+      example: 'Shows all masonry contractors across locations',
+      results: categoryResults.data || [],
+    },
+  ];
+} catch (error) {
+  console.error('Error fetching demo data:', error);
+}
 
 // Generate breadcrumb example
 const breadcrumbExample = [
@@ -158,10 +222,10 @@ try {
       }
     }
 
-    const response = await query;
+    const { data, error } = await query;
     searchResults = {
-      data: response.data,
-      error: response.error ? { message: response.error.message } : null,
+      data,
+      error: error ? { message: error.message } : null,
     };
   }
 } catch (error) {

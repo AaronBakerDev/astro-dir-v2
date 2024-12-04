@@ -1,20 +1,36 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import SearchResults from '../../components/directory/SearchResults.astro';
-import { supabase } from '../../../app_v2/src/lib/supabase';
+import { supabase } from '../../lib/supabase';
+// @ts-ignore-unused-imports
 import type { PostgrestResponse } from '@supabase/supabase-js';
 
+interface Place {
+  id: number;
+  title: string;
+  category: string;
+  province_state: string;
+  city: string[];
+  rating?: number;
+}
+
 interface SearchResult {
-  data: any[] | null;
+  data: Place[] | null;
   error: {
     message: string;
   } | null;
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+  };
 }
 
 // Get search params
 const url = new URL(Astro.request.url);
 const searchQuery = url.searchParams.get('search') || '';
 const serviceFilter = url.searchParams.get('service') || '';
+const stateFilter = url.searchParams.get('state') || '';
 const currentPage = parseInt(url.searchParams.get('page') || '1');
 const itemsPerPage = 12;
 

@@ -1,6 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { supabase } from '../../../app_v2/src/lib/supabase';
+import { supabase } from '../../lib/supabase';
 import SearchForm from '../../components/directory/SearchForm.astro';
 import SearchResults from '../../components/directory/SearchResults.astro';
 
@@ -8,6 +8,8 @@ import SearchResults from '../../components/directory/SearchResults.astro';
 const url = new URL(Astro.request.url);
 const searchQuery = url.searchParams.get('search') || '';
 const selectedServiceId = url.searchParams.get('service') || '';
+const currentPage = parseInt(url.searchParams.get('page') || '1');
+const itemsPerPage = 12;
 
 // Service categories mapping
 const serviceCategories = [
@@ -38,22 +40,65 @@ const selectedCategory = serviceCategories.find(
   (cat) => cat.id === selectedServiceId
 );
 
-// Build the query
-let query = supabase.from('query_places_view').select('*');
-
-// Apply search if provided
-if (searchQuery) {
-  query = query.ilike('title', `%${searchQuery}%`);
+interface SearchResult {
+  data: any[] | null;
+  error: {
+    message: string;
+  } | null;
+  pagination?: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+  };
 }
 
-// Apply service filter if selected
-if (selectedCategory) {
-  query = query.eq('category', selectedCategory.name);
+let searchResults: SearchResult = { data: null, error: null };
+
+try {
+  // Build the query
+  let query = supabase.from('places').select('*', { count: 'exact' });
+
+  // Apply search if provided
+  if (searchQuery) {
+    query = query.ilike('title', `%${searchQuery}%`);
+  }
+
+  // Apply service filter if selected
+  if (selectedCategory) {
+    query = query.eq('category', selectedCategory.name);
+  }
+
+  // Calculate pagination
+  const from = (currentPage - 1) * itemsPerPage;
+  const to = from + itemsPerPage - 1;
+
+  // Execute the query with pagination
+  const { data, error, count } = await query
+    .order('rating', { ascending: false })
+    .range(from, to);
+
+  searchResults = {
+    data: data || [],
+    error: error ? { message: error.message } : null,
+    pagination: {
+      currentPage,
+      totalPages: count ? Math.ceil(count / itemsPerPage) : 0,
+      totalItems: count || 0,
+    },
+  };
+} catch (error) {
+  searchResults = {
+    data: null,
+    error: { message: 'An unexpected error occurred' },
+  };
 }
 
-const { data: places, error } = await query;
-
-console.log('Search results:', { places, error });
+// Helper function to generate pagination URL
+const getPaginationUrl = (page: number) => {
+  const params = new URLSearchParams(url.searchParams);
+  params.set('page', page.toString());
+  return `?${params.toString()}`;
+};
 ---
 
 <Layout title='Search Results | Find Local Chimney Professionals'>
@@ -73,13 +118,44 @@ console.log('Search results:', { places, error });
     />
 
     {
-      error && (
+      searchResults.error && (
         <div class='p-4 bg-red-50 text-red-600 rounded-lg'>
-          Error loading professionals: {error.message}
+          Error loading professionals: {searchResults.error.message}
         </div>
       )
     }
 
-    <SearchResults places={places || []} selectedCategory={selectedCategory} />
+    <SearchResults
+      places={searchResults.data || []}
+      selectedCategory={selectedCategory}
+      totalCount={searchResults.pagination?.totalItems}
+    />
+
+    {/* Pagination Controls */}
+    {
+      searchResults.pagination && searchResults.pagination.totalPages > 1 && (
+        <div class='flex justify-center gap-2 mt-8'>
+          {currentPage > 1 && (
+            <a
+              href={getPaginationUrl(currentPage - 1)}
+              class='px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700'>
+              Previous
+            </a>
+          )}
+
+          <span class='px-4 py-2 text-gray-600'>
+            Page {currentPage} of {searchResults.pagination.totalPages}
+          </span>
+
+          {currentPage < searchResults.pagination.totalPages && (
+            <a
+              href={getPaginationUrl(currentPage + 1)}
+              class='px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-700'>
+              Next
+            </a>
+          )}
+        </div>
+      )
+    }
   </div>
 </Layout>
