@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractIdFromSlug, generateSlug } from './slugUtils';
+import { extractIdFromSlug, generateSlug } from '../../src/utils/slugUtils';
 
 describe('extractIdFromSlug', () => {
   it('should extract ID from valid slug', () => {
